@@ -1,6 +1,9 @@
-
 node_modules
 dist
 .env
 .env.local
 .DS_Store
+
+# Local Private Documentation / Blueprints
+PROJECT_BLUEPRINT.md
+PROJECT_BLUEPRINT.html
