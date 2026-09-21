@@ -1,18 +1,19 @@
-# 🚀 Job Tracker — Intelligent Job Application Pipeline
+# 🚀 Job Tracker — Minimalist Application Pipeline
 
 <div align="center">
 
 ![Job Tracker Hero Banner](./public/assets/jobbase-hero.jpg)
 
-**A high-performance, mobile-first Single-Page Application (SPA) designed for modern software engineers, tech professionals, and job seekers to effortlessly track, manage, and close career opportunities.**
+**A high-performance, keyboard-friendly Single-Page Application (SPA) designed for software engineers and tech professionals to track applications, stages, and offers with zero fluff.**
 
-[![Vite](https://img.shields.io/badge/Vite-6.2.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.17-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Client_v2-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Auth_%26_Postgres_RLS-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Resend](https://img.shields.io/badge/Resend-Email_OTP-black?style=for-the-badge&logo=resend&logoColor=white)](https://resend.com/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/)
-[![Status](https://img.shields.io/badge/Deployment-Ready-emerald?style=for-the-badge)](#)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](#license)
 
-[Features](#-key-features) • [Database Architecture](#-database-architecture) • [Getting Started](#-getting-started) • [Supabase Setup](#-supabase-sql-schema) • [Deployment](#-deployment)
+[Features](#-key-features) • [Architecture & Schema](#-database-architecture--sql-schema) • [Quick Start](#-getting-started) • [Deployment](#-deployment)
 
 </div>
 
@@ -20,81 +21,73 @@
 
 ## 🌟 Key Features
 
-### 🗂️ 1. Tabbed 3-View Architecture (Single Page Routing)
-- **Overview (Dashboard)**:
-  - 4 Key Metric Cards (Active Applications, In Interview, Offers Received, Archived Total).
-  - Quick-action jump cards: "Log an Application" and "Review Active Pipeline".
-  - Recent pipeline activity preview.
-- **New Application (Focused Intake)**:
-  - Standalone, focused form with dynamic company, job type, and status lookups.
-  - Inline **`+ New`** button to create companies on-the-fly and auto-select them without page reloads.
-  - Simplified **Salary** input (no placeholder text).
-  - Sleek floppy-disk save icon button with animated loading state and non-blocking toast notifications.
-- **Applied (Pipeline & Tracker)**:
-  - Segmented control to seamlessly toggle between **Active Pipeline** and **Archived**.
-  - Search by company/role and filter by application status.
-  - Desktop data table and mobile stacked card view (< 768px) with 48px touch targets.
+### 🔐 1. 2-Step OTP Authentication & Account Isolation
+- **Bot-Proof 2-Step OTP Flow**:
+  - Step 1: User enters email and password to register.
+  - Step 2: Supabase / Resend delivers a numeric verification code (supports 6 to 8+ digits).
+  - Auto-submits on the 8th digit with inline error handling and a "Resend code" option.
+- **Postgres Row Level Security (RLS)**:
+  - All database queries are automatically scoped to the logged-in user via `user_id = auth.uid()`, guaranteeing absolute data privacy and isolation.
+- **Interactive Demo Mode**:
+  - Test the entire application and pipeline workflows without live Supabase credentials using the built-in demo account (`demo@jobtracker.io`).
 
-### ⚡ 2. Frictionless Inline Status Auto-Save
-- Direct status modification right inside the table or mobile card via dynamic badge dropdowns.
-- Changes trigger immediate asynchronous updates to Supabase (`applications.status_id`), with instant optimistic UI reflection and micro-toast confirmations.
-- Full support for the database `updated_at` trigger column, visible in row tooltips and timestamps.
+### 🎯 2. Follow-Up Radar
+- Automatically analyzes active applications on the **Overview** dashboard.
+- Highlights stale applications requiring candidate attention (e.g. applications with no status changes after 7+ days or upcoming interview stages).
+- Provides instant jump shortcuts to follow up with recruiters.
 
-### 🎨 3. Minimal Header, Theme Toggle & Conditional Branding
-- **Conditional Creator Tag**: Displays `"by NearXkie"` exclusively on the initial landing view ("Overview") during the first session load. As soon as the user navigates away or switches tabs, it smoothly fades out and permanently simplifies to `"Job Tracker"`.
-- **Theme Toggle**: Switch between **Dark**, **Light**, and **System Default** modes using Tailwind's `dark:` classes, persisting preference in `localStorage`.
-- **Minimal Connection Indicator**: Sleek pulsing dot and info icon with hover tooltip showing real-time Supabase connection status and latency.
+### 📋 3. Wide-Canvas Intake & Job Spec Preservation
+- **Detailed Form**: Track company, role title, job type, status, salary target, date applied, and listing URL.
+- **Key Skills & Tech Stack**: Store comma-separated skills tags (e.g., `Python, FastAPI, React, PostgreSQL`).
+- **Job Description Archive**: Monospace expandable textarea allowing you to paste and save the entire job description and qualifications for permanent offline reference.
+- **On-the-Fly Company Creation**: Create new company profiles directly from the intake form without losing your draft.
 
-### 🗄️ 3. Atomic Application Archiving
-- Archive completed or historic applications with one click.
-- Preserves full application history in `applications_archive` (including company name, role, final status, salary target, and notes) and purges the active record.
-- Dedicated **Archive View** with permanent deletion logs.
+### 🔍 4. Slide-Over "View Spec" Drawer
+- Inspect complete application specifications at any time by clicking the role name or the **"Spec"** button.
+- Displays:
+  - Role, Company, Location, and Status Badge.
+  - Metadata Grid: Job type, salary expectation, application date, and dynamic relative update time (`just now`, `2d ago`).
+  - Key Skills rendered as interactive tag pills.
+  - Formatted Job Description with a one-click **"Copy"** button to copy specs to your clipboard.
+  - Notes & Timeline history.
+- Available across both **Active** and **Archived** applications.
 
-### 🛡️ 4. Connection Resilience & Demo Mode
-- **Live Supabase Health Indicator**: Checks database connectivity on page load and reflects live status in the header badge.
-- **Zero-Crash Demo Mode**: If credentials in `.env` are placeholders or not yet configured, JobBase automatically engages an interactive simulation with local persistence so the UI and workflows can be previewed immediately.
+### ⚡ 5. Reactive Inline Status Auto-Save
+- Update application stages directly inside table rows or mobile cards using interactive badge dropdowns.
+- Changes update asynchronously in Supabase with instant optimistic UI reflection and micro-toast confirmations.
+- Automatically refreshes status badge colors and the dynamic relative timestamp (`updated_at`).
 
-### 🔍 5. Real-Time Search & Filtering
-- Instant, non-blocking client-side search across company names and job titles.
-- Multi-status filter to focus on high-priority stages (e.g., "In Interview", "Offers Received").
+### 🗂️ 6. Split Pipeline & Advanced Search
+- **Active vs. Archive**: Toggle seamlessly between your active pipeline and historical archived applications.
+- **Instant Search & Multi-Filter**: Filter applications in real time by company name, role, or specific stage (Applied, Screening, Interviewing, Offer Received, Rejected, Withdrawn).
+- **Responsive Dual Layout**: Dense, high-information table on desktop; touch-friendly stacked cards on mobile (< 768px).
 
-### 📱 6. Production & SEO Ready
-- OpenGraph metadata, theme color, responsive viewport, and Google Font (`Inter`) integration.
-- Dynamic document titles updating based on view (`Active Pipeline | JobBase`, `Archive | JobBase`).
-- Includes GitHub Pages SPA fallback (`public/404.html`).
+### 🎨 7. Linear / Raycast Graphite Design Language
+- Modern, dark-first graphite aesthetic (`bg-zinc-950`, `border-zinc-800`, `text-zinc-100`).
+- **Theme Switcher**: Seamlessly switch between **Dark**, **Light**, and **System Default** themes (persisted in `localStorage`).
+- **Conditional Branding**: The creator tag `"by NearXkie"` subtly displays during the initial session load and fades out once navigating tabs.
+- **Live Connection Monitor**: Real-time Supabase connection indicator and latency tooltip in the header.
 
 ---
 
-## 📐 Database Architecture
+## 📐 Database Architecture & SQL Schema
 
-The data model follows a relational architecture designed for PostgreSQL in Supabase.
+The database is built on PostgreSQL with Supabase Row Level Security (RLS) enforcing multi-tenant isolation per user.
 
 ```mermaid
 erDiagram
+    users ||--o{ companies : "owns"
+    users ||--o{ applications : "owns"
+    users ||--o{ applications_archive : "owns"
     sectors ||--o{ companies : "categorizes"
     companies ||--o{ applications : "has"
     job_types ||--o{ applications : "classifies"
     statuses ||--o{ applications : "tracks"
     applications ||--o{ applications_archive : "archived into"
 
-    sectors {
-        int8 id PK
-        text name
-    }
-
-    job_types {
-        int8 id PK
-        text name
-    }
-
-    statuses {
-        int8 id PK
-        text name
-        text badge_color
-    }
-
     companies {
         int8 id PK
+        uuid user_id FK
         text name
         int8 sector_id FK
         text careers_url
@@ -105,6 +98,7 @@ erDiagram
 
     applications {
         int8 id PK
+        uuid user_id FK
         int8 company_id FK
         text job_title
         int8 job_type_id FK
@@ -112,12 +106,16 @@ erDiagram
         text listing_url
         date applied_date
         text salary_target
+        text skills_required
+        text job_description
         text notes
         timestamptz created_at
+        timestamptz updated_at
     }
 
     applications_archive {
         int8 id PK
+        uuid user_id FK
         int8 original_application_id
         text company_name
         text job_title
@@ -125,40 +123,41 @@ erDiagram
         date applied_date
         text listing_url
         text salary_target
+        text skills_required
+        text job_description
         text notes
         timestamptz archived_at
     }
 ```
 
----
+### Supabase SQL Migration Script
 
-## 🗃️ Supabase SQL Schema
-
-To set up your Supabase project, execute the following SQL in your **Supabase SQL Editor**:
+Run this script in the **Supabase SQL Editor** to initialize the database:
 
 ```sql
--- 1. Create Sectors Table
+-- 1. Create Sectors Table (Global Catalog)
 create table if not exists sectors (
   id bigint primary key generated always as identity,
   name text not null
 );
 
--- 2. Create Job Types Table
+-- 2. Create Job Types Table (Global Catalog)
 create table if not exists job_types (
   id bigint primary key generated always as identity,
   name text not null
 );
 
--- 3. Create Statuses Table
+-- 3. Create Statuses Table (Global Catalog)
 create table if not exists statuses (
   id bigint primary key generated always as identity,
   name text not null,
   badge_color text
 );
 
--- 4. Create Companies Table
+-- 4. Create Companies Table (User Isolated)
 create table if not exists companies (
   id bigint primary key generated always as identity,
+  user_id uuid default auth.uid(),
   name text not null,
   sector_id bigint references sectors(id) on delete set null,
   careers_url text,
@@ -167,9 +166,10 @@ create table if not exists companies (
   created_at timestamptz default now()
 );
 
--- 5. Create Applications Table
+-- 5. Create Applications Table (User Isolated)
 create table if not exists applications (
   id bigint primary key generated always as identity,
+  user_id uuid default auth.uid(),
   company_id bigint not null references companies(id) on delete cascade,
   job_title text not null,
   job_type_id bigint references job_types(id) on delete set null,
@@ -177,13 +177,17 @@ create table if not exists applications (
   listing_url text,
   applied_date date not null default current_date,
   salary_target text,
+  skills_required text,
+  job_description text,
   notes text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
--- 6. Create Applications Archive Table
+-- 6. Create Applications Archive Table (User Isolated)
 create table if not exists applications_archive (
   id bigint primary key generated always as identity,
+  user_id uuid default auth.uid(),
   original_application_id bigint,
   company_name text not null,
   job_title text not null,
@@ -191,11 +195,27 @@ create table if not exists applications_archive (
   applied_date date,
   listing_url text,
   salary_target text,
+  skills_required text,
+  job_description text,
   notes text,
   archived_at timestamptz default now()
 );
 
--- Enable Row Level Security (RLS) with Public Access
+-- 7. Trigger to auto-update updated_at on applications
+create or replace function update_updated_at_column()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists set_applications_updated_at on applications;
+create trigger set_applications_updated_at
+before update on applications
+for each row execute function update_updated_at_column();
+
+-- 8. Enable Row Level Security (RLS)
 alter table sectors enable row level security;
 alter table job_types enable row level security;
 alter table statuses enable row level security;
@@ -203,27 +223,37 @@ alter table companies enable row level security;
 alter table applications enable row level security;
 alter table applications_archive enable row level security;
 
-create policy "Public read/write sectors" on sectors for all using (true) with check (true);
-create policy "Public read/write job_types" on job_types for all using (true) with check (true);
-create policy "Public read/write statuses" on statuses for all using (true) with check (true);
-create policy "Public read/write companies" on companies for all using (true) with check (true);
-create policy "Public read/write applications" on applications for all using (true) with check (true);
-create policy "Public read/write applications_archive" on applications_archive for all using (true) with check (true);
+-- Public read for lookup catalogs
+create policy "Public read sectors" on sectors for select using (true);
+create policy "Public read job_types" on job_types for select using (true);
+create policy "Public read statuses" on statuses for select using (true);
 
--- Initial Seed Data
+-- User-isolated policies for private application data
+create policy "User isolate companies" on companies
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "User isolate applications" on applications
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "User isolate applications_archive" on applications_archive
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 9. Seed Catalog Data
 insert into sectors (name) values
   ('Technology & Software'),
   ('Fintech & Banking'),
   ('Healthcare & Biotech'),
   ('E-commerce & Retail'),
-  ('Consulting & Professional Services');
+  ('Consulting & Professional Services')
+on conflict do nothing;
 
 insert into job_types (name) values
   ('Full-time'),
   ('Contract'),
   ('Part-time'),
   ('Internship'),
-  ('Remote / Freelance');
+  ('Remote / Freelance')
+on conflict do nothing;
 
 insert into statuses (name, badge_color) values
   ('Applied', 'blue'),
@@ -231,7 +261,8 @@ insert into statuses (name, badge_color) values
   ('Interviewing', 'purple'),
   ('Offer Received', 'green'),
   ('Rejected', 'red'),
-  ('Withdrawn', 'gray');
+  ('Withdrawn', 'gray')
+on conflict do nothing;
 ```
 
 ---
@@ -240,52 +271,47 @@ insert into statuses (name, badge_color) values
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/NearXkie/job-tracker.git
 cd job-tracker
 npm install
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env` file in the project root (or copy `.env.example`):
+Create a `.env` file in the root directory:
 ```bash
 cp .env.example .env
 ```
 
-Set your Supabase credentials:
+Add your Supabase project credentials:
 ```env
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_SUPABASE_ANON_KEY=your-actual-anon-key
 ```
 
-### 3. Start Development Server
+> **Note**: If `.env` is omitted or contains placeholder values, Job Tracker automatically activates **Interactive Demo Mode** with local persistence.
+
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
-Open your browser at `http://localhost:5173`.
+Open your browser at `http://localhost:5173/job-tracker/`.
 
 ### 4. Build for Production
 ```bash
 npm run build
 ```
-The optimized bundle will be created in the `dist/` directory.
+The optimized production bundle will be generated in `dist/`.
 
 ---
 
 ## 🚢 Deployment
 
-### Deploying to GitHub Pages
-1. Ensure `public/404.html` is present (already configured in this repository).
-2. Configure your GitHub Actions workflow or run:
-   ```bash
-   npm run build
-   # Push dist directory to gh-pages branch
-   ```
+### Automated GitHub Pages Deployment
+The repository includes an automated GitHub Actions deployment workflow in `.github/workflows/deploy.yml`.
 
-### Deploying to Vercel or Netlify
-1. Connect your Git repository.
-2. Build command: `npm run build`
-3. Output directory: `dist`
-4. Configure environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) in the provider dashboard.
+1. In your GitHub repository settings, go to **Settings > Pages**.
+2. Under **Build and deployment > Source**, select **GitHub Actions**.
+3. Any push to `main` will automatically build the app and deploy it to GitHub Pages.
 
 ---
 
@@ -293,27 +319,28 @@ The optimized bundle will be created in the `dist/` directory.
 
 ```
 job-tracker/
-├── .env                      # Environment configuration
-├── .env.example              # Template environment variables
-├── .gitignore                # Ignored paths (node_modules, dist, .env)
-├── index.html                # Main SPA markup & layout
-├── package.json              # Project dependencies & scripts
-├── postcss.config.js         # PostCSS configuration
-├── tailwind.config.js        # Tailwind CSS theme & plugin config
-├── vite.config.js            # Vite bundler configuration
-├── schema.png                # Supabase ERD diagram
+├── .github/
+│   └── workflows/
+│       └── deploy.yml        # GitHub Actions automated deployment workflow
 ├── public/
 │   ├── 404.html              # GitHub Pages SPA fallback
 │   └── assets/
-│       └── jobbase-hero.jpg  # Generated hero banner
+│       └── jobbase-hero.jpg  # App hero banner
 ├── src/
-│   ├── main.js               # Application logic, state, and DOM controller
-│   ├── style.css             # Tailwind base styles and glassmorphic utilities
-│   └── supabase.js           # Supabase client, queries, and fallback store
-└── readme.md                 # Complete project documentation
+│   ├── main.js               # Application state controller, OTP flow & UI rendering
+│   ├── style.css             # Tailwind base & minimalist glass styling
+│   └── supabase.js           # Supabase client, queries, OTP auth & mock store
+├── .env                      # Local environment variables (git-ignored)
+├── .env.example              # Environment variables template
+├── .gitignore                # Git ignore configuration
+├── index.html                # Single-page application HTML5 layout
+├── package.json              # Dependencies and build scripts
+├── tailwind.config.js        # Tailwind styling configuration
+├── vite.config.js            # Vite configuration with base path
+└── README.md                 # Project documentation
 ```
 
 ---
 
 ## 📄 License
-MIT License © 2026 JobBase. Designed for ambitious professionals.
+MIT License © 2026 NearXkie. Built for ambitious builders and job seekers.
