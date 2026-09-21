@@ -269,6 +269,22 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// Sanitize URLs to prevent javascript: pseudoprotocol XSS
+function sanitizeUrl(url) {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  if (/^(javascript|data|vbscript):/i.test(trimmed)) {
+    return '#';
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^[\w.-]+\.[a-z]{2,}/i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return '#';
+}
+
 // Micro Toast Notifications
 export function showToast(message, type = 'success') {
   const toast = document.createElement('div');
@@ -289,11 +305,16 @@ export function showToast(message, type = 'success') {
 
   toast.innerHTML = `
     ${iconSvg}
-    <span class="flex-1">${message}</span>
-    <button class="text-zinc-500 hover:text-zinc-300 p-0.5 rounded transition-colors" onclick="this.parentElement.remove()">
+    <span class="flex-1">${escapeHtml(message)}</span>
+    <button type="button" class="text-zinc-500 hover:text-zinc-300 p-0.5 rounded transition-colors" aria-label="Dismiss">
       <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
     </button>
   `;
+
+  const dismissBtn = toast.querySelector('button');
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => toast.remove());
+  }
 
   elements.toastContainer.appendChild(toast);
 
@@ -710,8 +731,8 @@ function renderActiveApplications() {
                 ${escapeHtml(company.name || 'Unknown')}
               </span>
               ${
-                company.careers_url
-                  ? `<a href="${escapeHtml(company.careers_url)}" target="_blank" rel="noopener noreferrer" title="Careers Portal" class="text-zinc-500 hover:text-zinc-300 transition-colors">
+                company.careers_url && sanitizeUrl(company.careers_url) !== '#'
+                  ? `<a href="${escapeHtml(sanitizeUrl(company.careers_url))}" target="_blank" rel="noopener noreferrer" title="Careers Portal" class="text-zinc-500 hover:text-zinc-300 transition-colors">
                       <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                     </a>`
                   : ''
@@ -734,8 +755,8 @@ function renderActiveApplications() {
                 <svg class="w-3 h-3 text-zinc-500 hover:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
               </button>
               ${
-                app.listing_url
-                  ? `<a href="${escapeHtml(app.listing_url)}" target="_blank" rel="noopener noreferrer" title="Job Listing" class="text-zinc-500 hover:text-zinc-300 transition-colors">
+                app.listing_url && sanitizeUrl(app.listing_url) !== '#'
+                  ? `<a href="${escapeHtml(sanitizeUrl(app.listing_url))}" target="_blank" rel="noopener noreferrer" title="Job Listing" class="text-zinc-500 hover:text-zinc-300 transition-colors">
                       <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                     </a>`
                   : ''
@@ -1064,9 +1085,10 @@ function openJobDetailsDrawer(appId, isArchive = false) {
   elements.drawerStatusBadge.textContent = statusName;
 
   // Listing Link
-  if (app.listing_url) {
+  const safeListingUrl = sanitizeUrl(app.listing_url);
+  if (safeListingUrl && safeListingUrl !== '#') {
     elements.drawerListingContainer.classList.remove('hidden');
-    elements.drawerListingUrl.href = app.listing_url;
+    elements.drawerListingUrl.href = safeListingUrl;
   } else {
     elements.drawerListingContainer.classList.add('hidden');
   }
