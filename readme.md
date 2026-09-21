@@ -342,5 +342,14 @@ job-tracker/
 
 ---
 
+## ⚠️ Project Disclaimer & Architecture Notes
+
+- **Author & Concept:** Designed and directed by NearXkie for personal job application tracking.
+- **AI Collaboration:** Core application code, schema definitions, and workflow scripts were developed in close collaboration with AI tools.
+- **Security & Scope:** This application was built as a lightweight personal utility and portfolio demonstration. It has not undergone formal third-party security audits or penetration testing.
+- **Warranty:** Distributed under the **MIT License**. The software is provided "as is", without warranty of any kind. If you self-host or fork this repository, you do so at your own risk.
+
+---
+
 ## 📄 License
 MIT License © 2026 NearXkie. Built for ambitious builders and job seekers.
