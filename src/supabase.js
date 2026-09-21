@@ -15,6 +15,7 @@ export const supabase = (!isPlaceholderCredentials && supabaseUrl.startsWith('ht
 
 // Mock database storage for preview/demo when real Supabase is not connected
 const MOCK_STORAGE_KEY = 'jobtracker_mock_db_v3';
+const MOCK_AUTH_KEY = 'jobtracker_mock_auth_user';
 
 const defaultMockData = {
   sectors: [
@@ -112,7 +113,11 @@ function saveMockDb(data) {
   }
 }
 
-// Connection check with latency measurement
+
+// -------------------------------------------------------------
+// CONNECTION CHECK
+// -------------------------------------------------------------
+
 export async function checkSupabaseConnection() {
   if (isPlaceholderCredentials || !supabase) {
     return {
@@ -155,7 +160,10 @@ export async function checkSupabaseConnection() {
   }
 }
 
-// Sectors
+// -------------------------------------------------------------
+// DATA CATALOGS & CRUD (Evaluates through authenticated client)
+// -------------------------------------------------------------
+
 export async function fetchSectors() {
   if (!supabase) return getMockDb().sectors;
   const { data, error } = await supabase.from('sectors').select('*').order('name');
@@ -166,7 +174,6 @@ export async function fetchSectors() {
   return data;
 }
 
-// Job Types
 export async function fetchJobTypes() {
   if (!supabase) return getMockDb().job_types;
   const { data, error } = await supabase.from('job_types').select('*').order('name');
@@ -177,7 +184,6 @@ export async function fetchJobTypes() {
   return data;
 }
 
-// Statuses
 export async function fetchStatuses() {
   if (!supabase) return getMockDb().statuses;
   const { data, error } = await supabase.from('statuses').select('*').order('id');
@@ -188,7 +194,6 @@ export async function fetchStatuses() {
   return data;
 }
 
-// Companies
 export async function fetchCompanies() {
   if (!supabase) return getMockDb().companies;
   const { data, error } = await supabase
@@ -223,7 +228,6 @@ export async function createCompany(companyData) {
   return data;
 }
 
-// Applications (includes job_description, skills_required, updated_at)
 export async function fetchApplications() {
   if (!supabase) {
     const db = getMockDb();
@@ -235,7 +239,6 @@ export async function fetchApplications() {
     }));
   }
 
-  // Try fetching all columns including job_description and skills_required
   const { data, error } = await supabase
     .from('applications')
     .select(`
@@ -260,7 +263,6 @@ export async function fetchApplications() {
 
   if (error) {
     console.warn('Error fetching applications with extended columns, attempting fallback:', error);
-    // If table doesn't have job_description yet, gracefully query standard columns
     const { data: fallbackData, error: fallbackError } = await supabase
       .from('applications')
       .select(`
@@ -318,8 +320,6 @@ export async function createApplication(applicationData) {
     .single();
 
   if (error) {
-    console.warn('Error creating application with all columns, trying without optional new columns if schema differs:', error);
-    // If Supabase schema lacks job_description or skills_required, try inserting core fields
     if (error.message && (error.message.includes('job_description') || error.message.includes('skills_required'))) {
       const coreData = { ...applicationData };
       delete coreData.job_description;
@@ -337,7 +337,6 @@ export async function createApplication(applicationData) {
   return data;
 }
 
-// Frictionless Inline Status Update
 export async function updateApplicationStatus(id, newStatusId) {
   const now = new Date().toISOString();
 
@@ -396,7 +395,6 @@ export async function archiveApplication(app) {
     return archiveItem;
   }
 
-  // 1. Insert into applications_archive
   let { data: archiveData, error: archiveError } = await supabase
     .from('applications_archive')
     .insert([archiveRecord])
@@ -404,7 +402,6 @@ export async function archiveApplication(app) {
     .single();
 
   if (archiveError) {
-    // If schema lacks job_description or skills_required in applications_archive
     if (archiveError.message && (archiveError.message.includes('job_description') || archiveError.message.includes('skills_required'))) {
       const coreArchive = { ...archiveRecord };
       delete coreArchive.job_description;
@@ -421,7 +418,6 @@ export async function archiveApplication(app) {
     }
   }
 
-  // 2. Delete from applications
   const { error: deleteError } = await supabase
     .from('applications')
     .delete()
@@ -468,3 +464,135 @@ export async function deleteArchivedApplication(id) {
   if (error) throw error;
   return true;
 }
+
+// ==========================================
+// Authentication & Session Management
+// ==========================================
+const mockAuthListeners = new Set();
+
+function notifyMockAuthListeners(event, session) {
+  mockAuthListeners.forEach((listener) => {
+    try {
+      listener(event, session);
+    } catch (err) {
+      console.error('Error in mock auth listener:', err);
+    }
+  });
+}
+
+export async function getCurrentSession() {
+  if (supabase) {
+    return await supabase.auth.getSession();
+  }
+
+  // Demo / Mock Mode Session
+  try {
+    const raw = localStorage.getItem(MOCK_AUTH_KEY);
+    if (raw) {
+      const user = JSON.parse(raw);
+      return { data: { session: { user, access_token: 'mock-token' } }, error: null };
+    }
+  } catch (e) {
+    console.warn('Failed to parse mock auth user:', e);
+  }
+  return { data: { session: null }, error: null };
+}
+
+export async function signInWithEmail(email, password) {
+  if (supabase) {
+    return await supabase.auth.signInWithPassword({ email, password });
+  }
+
+  // Demo / Mock Mode Sign In
+  const mockUser = {
+    id: 'demo-user-mock-1',
+    email: email.trim().toLowerCase(),
+    app_metadata: {},
+    user_metadata: {},
+    created_at: new Date().toISOString(),
+  };
+  const session = { user: mockUser, access_token: 'mock-token' };
+  localStorage.setItem(MOCK_AUTH_KEY, JSON.stringify(mockUser));
+  notifyMockAuthListeners('SIGNED_IN', session);
+  return { data: { user: mockUser, session }, error: null };
+}
+
+export async function signUpWithEmail(email, password) {
+  if (supabase) {
+    return await supabase.auth.signUp({ email, password });
+  }
+
+  // Demo / Mock Mode Sign Up: returns user with session: null to preview 2-step OTP flow
+  const mockUser = {
+    id: 'demo-user-' + Date.now(),
+    email: email.trim().toLowerCase(),
+    app_metadata: {},
+    user_metadata: {},
+    created_at: new Date().toISOString(),
+  };
+  return { data: { user: mockUser, session: null }, error: null };
+}
+
+export async function verifyOtpSignup({ email, token }) {
+  if (supabase) {
+    return await supabase.auth.verifyOtp({
+      email,
+      token: token.trim(),
+      type: 'signup',
+    });
+  }
+
+  // Demo / Mock Mode OTP Verification
+  const cleanToken = (token || '').trim();
+  if (!cleanToken || cleanToken.length < 6) {
+    return { data: null, error: { message: 'Please enter a valid verification code (at least 6 digits).' } };
+  }
+  const mockUser = {
+    id: 'demo-user-mock-1',
+    email: (email || 'demo@jobtracker.io').trim().toLowerCase(),
+    app_metadata: {},
+    user_metadata: {},
+    created_at: new Date().toISOString(),
+  };
+  const session = { user: mockUser, access_token: 'mock-token' };
+  localStorage.setItem(MOCK_AUTH_KEY, JSON.stringify(mockUser));
+  notifyMockAuthListeners('SIGNED_IN', session);
+  return { data: { user: mockUser, session }, error: null };
+}
+
+export async function resendOtpSignup(email) {
+  if (supabase) {
+    return await supabase.auth.resend({
+      type: 'signup',
+      email,
+    });
+  }
+  return { data: {}, error: null };
+}
+
+export async function signOutUser() {
+  if (supabase) {
+    return await supabase.auth.signOut();
+  }
+
+  // Demo / Mock Mode Sign Out
+  localStorage.removeItem(MOCK_AUTH_KEY);
+  notifyMockAuthListeners('SIGNED_OUT', null);
+  return { error: null };
+}
+
+export function subscribeToAuthState(callback) {
+  if (supabase) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
+    return subscription;
+  }
+
+  // Demo / Mock Mode Auth Subscription
+  mockAuthListeners.add(callback);
+  return {
+    unsubscribe: () => {
+      mockAuthListeners.delete(callback);
+    },
+  };
+}
+

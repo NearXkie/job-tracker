@@ -11,10 +11,20 @@ import {
   archiveApplication,
   fetchArchivedApplications,
   deleteArchivedApplication,
+  getCurrentSession,
+  signInWithEmail,
+  signUpWithEmail,
+  verifyOtpSignup,
+  resendOtpSignup,
+  signOutUser,
+  subscribeToAuthState,
 } from './supabase.js';
 
 // Application State Store
 const state = {
+  currentUser: null,
+  authMode: 'signin', // 'signin' | 'signup'
+  pendingOtpEmail: '',
   sectors: [],
   jobTypes: [],
   statuses: [],
@@ -30,6 +40,40 @@ const state = {
 
 // DOM Elements
 const elements = {
+  // Authentication Elements
+  viewAuth: document.getElementById('view-auth'),
+  authHeading: document.getElementById('auth-heading'),
+  authSubheading: document.getElementById('auth-subheading'),
+  authCredentialsStep: document.getElementById('auth-credentials-step'),
+  btnToggleSignIn: document.getElementById('btn-toggle-signin'),
+  btnToggleSignUp: document.getElementById('btn-toggle-signup'),
+  authForm: document.getElementById('auth-form'),
+  authEmailInput: document.getElementById('auth-email'),
+  authPasswordInput: document.getElementById('auth-password'),
+  btnAuthSubmit: document.getElementById('btn-auth-submit'),
+  authSubmitText: document.getElementById('auth-submit-text'),
+  authSubmitSpinner: document.getElementById('auth-submit-spinner'),
+  btnDemoLogin: document.getElementById('btn-demo-login'),
+
+  // Step 2 OTP Elements
+  authOtpStep: document.getElementById('auth-otp-step'),
+  authOtpTargetEmail: document.getElementById('auth-otp-target-email'),
+  authOtpForm: document.getElementById('auth-otp-form'),
+  authOtpInput: document.getElementById('auth-otp-input'),
+  authOtpError: document.getElementById('auth-otp-error'),
+  btnVerifyOtp: document.getElementById('btn-verify-otp'),
+  authVerifyText: document.getElementById('auth-verify-text'),
+  authVerifySpinner: document.getElementById('auth-verify-spinner'),
+  btnOtpBack: document.getElementById('btn-otp-back'),
+  btnResendOtp: document.getElementById('btn-resend-otp'),
+
+  // User Profile & App Shell
+  userProfileControls: document.getElementById('user-profile-controls'),
+  userEmailBadge: document.getElementById('user-email-badge'),
+  btnSignOut: document.getElementById('btn-sign-out'),
+  navTabsContainer: document.getElementById('nav-tabs-container'),
+  authenticatedApp: document.getElementById('authenticated-app'),
+
   // Header & Branding
   creatorTag: document.getElementById('creator-tag'),
   btnThemeToggle: document.getElementById('btn-theme-toggle'),
@@ -1261,8 +1305,349 @@ async function handleConfirmDelete() {
   }
 }
 
+// ==========================================
+// Authentication Controller
+// ==========================================
+function setAuthMode(mode) {
+  state.authMode = mode;
+  if (!elements.btnToggleSignIn || !elements.btnToggleSignUp) return;
+
+  if (mode === 'signin') {
+    elements.btnToggleSignIn.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 bg-zinc-100 text-zinc-900 shadow-sm';
+    elements.btnToggleSignUp.className = 'flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-150 text-zinc-400 hover:text-zinc-200';
+    if (elements.authHeading) elements.authHeading.textContent = 'Welcome to Job Tracker';
+    if (elements.authSubheading) elements.authSubheading.textContent = 'Sign in to access your applications and pipeline.';
+    if (elements.authSubmitText) elements.authSubmitText.textContent = 'Sign In';
+  } else {
+    elements.btnToggleSignUp.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 bg-zinc-100 text-zinc-900 shadow-sm';
+    elements.btnToggleSignIn.className = 'flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-150 text-zinc-400 hover:text-zinc-200';
+    if (elements.authHeading) elements.authHeading.textContent = 'Create your account';
+    if (elements.authSubheading) elements.authSubheading.textContent = 'Start tracking your career opportunities with account isolation.';
+    if (elements.authSubmitText) elements.authSubmitText.textContent = 'Create Account';
+  }
+}
+
+function showOtpStep(email) {
+  state.pendingOtpEmail = email;
+  if (elements.authCredentialsStep) elements.authCredentialsStep.classList.add('hidden');
+  if (elements.authOtpStep) elements.authOtpStep.classList.remove('hidden');
+
+  if (elements.authHeading) elements.authHeading.textContent = 'Enter Verification Code';
+  if (elements.authSubheading) elements.authSubheading.textContent = 'Check your email for the verification code.';
+  if (elements.authOtpTargetEmail) elements.authOtpTargetEmail.textContent = email;
+  if (elements.authOtpInput) {
+    elements.authOtpInput.value = '';
+    setTimeout(() => elements.authOtpInput?.focus(), 80);
+  }
+  if (elements.authOtpError) {
+    elements.authOtpError.classList.add('hidden');
+    elements.authOtpError.textContent = '';
+  }
+}
+
+function showCredentialsStep() {
+  if (elements.authOtpStep) elements.authOtpStep.classList.add('hidden');
+  if (elements.authCredentialsStep) elements.authCredentialsStep.classList.remove('hidden');
+  setAuthMode(state.authMode);
+}
+
+function setOtpLoading(isLoading) {
+  if (elements.btnVerifyOtp) elements.btnVerifyOtp.disabled = isLoading;
+  if (elements.authVerifySpinner) {
+    elements.authVerifySpinner.classList.toggle('hidden', !isLoading);
+  }
+  if (elements.authVerifyText) {
+    elements.authVerifyText.textContent = isLoading ? 'Verifying...' : 'Verify & Continue';
+  }
+}
+
+function setAuthLoading(isLoading) {
+  if (elements.btnAuthSubmit) elements.btnAuthSubmit.disabled = isLoading;
+  if (elements.authSubmitSpinner) {
+    elements.authSubmitSpinner.classList.toggle('hidden', !isLoading);
+  }
+  if (elements.authSubmitText) {
+    if (isLoading) {
+      elements.authSubmitText.textContent = state.authMode === 'signup' ? 'Creating Account...' : 'Signing In...';
+    } else {
+      elements.authSubmitText.textContent = state.authMode === 'signup' ? 'Create Account' : 'Sign In';
+    }
+  }
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const email = (elements.authEmailInput?.value || '').trim();
+  const password = (elements.authPasswordInput?.value || '').trim();
+
+  if (!email || !password) {
+    showToast('Please enter both email and password.', 'error');
+    return;
+  }
+
+  if (password.length < 6) {
+    showToast('Password must be at least 6 characters long.', 'error');
+    return;
+  }
+
+  setAuthLoading(true);
+
+  try {
+    if (state.authMode === 'signin') {
+      const { data, error } = await signInWithEmail(email, password);
+      if (error) {
+        showToast(error.message || 'Failed to sign in. Please verify credentials.', 'error');
+      } else {
+        showToast('Signed in successfully!', 'success');
+        if (elements.authForm) elements.authForm.reset();
+        handleAuthStateChange(data?.session);
+      }
+    } else {
+      const { data, error } = await signUpWithEmail(email, password);
+      if (error) {
+        showToast(error.message || 'Failed to create account.', 'error');
+      } else if (data?.user && data?.session === null) {
+        // Step 1 Success: Transition to Step 2 OTP Verification
+        if (elements.authPasswordInput) {
+          elements.authPasswordInput.value = '';
+        }
+        showOtpStep(email);
+        showToast('Verification code sent to ' + email, 'info');
+      } else {
+        showToast('Account created successfully!', 'success');
+        if (elements.authForm) elements.authForm.reset();
+        handleAuthStateChange(data?.session);
+      }
+    }
+  } catch (err) {
+    console.error('Auth error:', err);
+    showToast('Authentication failed: ' + (err.message || err), 'error');
+  } finally {
+    setAuthLoading(false);
+  }
+}
+
+async function handleVerifyOtpSubmit(e) {
+  e.preventDefault();
+  const token = (elements.authOtpInput?.value || '').trim();
+  const email = state.pendingOtpEmail || (elements.authEmailInput?.value || '').trim();
+
+  // Ensure the validator accepts 6 to 8+ digits
+  if (!token || token.length < 6) {
+    if (elements.authOtpError) {
+      elements.authOtpError.textContent = 'Please enter a valid verification code.';
+      elements.authOtpError.classList.remove('hidden');
+    }
+    showToast('Please enter a valid verification code.', 'error');
+    return;
+  }
+
+  if (!email) {
+    showToast('No pending email found. Please sign up again.', 'error');
+    showCredentialsStep();
+    return;
+  }
+
+  setOtpLoading(true);
+  if (elements.authOtpError) elements.authOtpError.classList.add('hidden');
+
+  try {
+    const { data, error } = await verifyOtpSignup({
+      email,
+      token,
+    });
+
+    if (error) {
+      if (elements.authOtpError) {
+        elements.authOtpError.textContent = error.message || 'Invalid verification code.';
+        elements.authOtpError.classList.remove('hidden');
+      }
+      showToast(error.message || 'Verification failed. Check your code.', 'error');
+    } else {
+      showToast('Email verified successfully! Welcome to Job Tracker.', 'success');
+      showCredentialsStep();
+      if (elements.authForm) elements.authForm.reset();
+      handleAuthStateChange(data?.session);
+    }
+  } catch (err) {
+    console.error('OTP Verification error:', err);
+    if (elements.authOtpError) {
+      elements.authOtpError.textContent = err.message || 'Verification failed.';
+      elements.authOtpError.classList.remove('hidden');
+    }
+    showToast('Verification error: ' + (err.message || err), 'error');
+  } finally {
+    setOtpLoading(false);
+  }
+}
+
+async function handleResendOtp() {
+  const email = state.pendingOtpEmail || (elements.authEmailInput?.value || '').trim();
+  if (!email) {
+    showToast('No email found to resend code to.', 'error');
+    return;
+  }
+
+  try {
+    const { error } = await resendOtpSignup(email);
+    if (error) {
+      showToast('Failed to resend code: ' + error.message, 'error');
+    } else {
+      showToast('A new verification code has been sent to ' + email, 'info');
+      if (elements.authOtpError) elements.authOtpError.classList.add('hidden');
+      if (elements.authOtpInput) {
+        elements.authOtpInput.value = '';
+        elements.authOtpInput.focus();
+      }
+    }
+  } catch (err) {
+    console.error('Resend error:', err);
+    showToast('Failed to resend code', 'error');
+  }
+}
+
+async function handleDemoLogin() {
+  setAuthLoading(true);
+  try {
+    const { data, error } = await signInWithEmail('demo@jobtracker.io', 'password123');
+    if (error) {
+      showToast('Demo login error: ' + error.message, 'error');
+    } else {
+      showToast('Signed in as demo@jobtracker.io', 'info');
+      showCredentialsStep();
+      handleAuthStateChange(data?.session);
+    }
+  } catch (err) {
+    console.error('Demo login failed:', err);
+    showToast('Demo login failed', 'error');
+  } finally {
+    setAuthLoading(false);
+  }
+}
+
+async function handleSignOut() {
+  try {
+    await signOutUser();
+    showToast('Signed out of Job Tracker.', 'info');
+    showCredentialsStep();
+    handleAuthStateChange(null);
+  } catch (err) {
+    console.error('Sign out error:', err);
+    showToast('Sign out failed: ' + err.message, 'error');
+  }
+}
+
+function handleAuthStateChange(session) {
+  const user = session?.user || null;
+  state.currentUser = user;
+
+  if (user) {
+    showCredentialsStep();
+    // Authenticated state
+    if (elements.userEmailBadge) {
+      elements.userEmailBadge.textContent = user.email || 'user';
+    }
+    if (elements.userProfileControls) {
+      elements.userProfileControls.classList.remove('hidden');
+      elements.userProfileControls.classList.add('flex');
+    }
+    if (elements.navTabsContainer) {
+      elements.navTabsContainer.classList.remove('hidden');
+    }
+    if (elements.authenticatedApp) {
+      elements.authenticatedApp.classList.remove('hidden');
+    }
+    if (elements.viewAuth) {
+      elements.viewAuth.classList.add('hidden');
+    }
+
+    // Load data for the active user
+    loadInitialData();
+  } else {
+    // Unauthenticated state
+    if (elements.userProfileControls) {
+      elements.userProfileControls.classList.add('hidden');
+      elements.userProfileControls.classList.remove('flex');
+    }
+    if (elements.navTabsContainer) {
+      elements.navTabsContainer.classList.add('hidden');
+    }
+    if (elements.authenticatedApp) {
+      elements.authenticatedApp.classList.add('hidden');
+    }
+    if (elements.viewAuth) {
+      elements.viewAuth.classList.remove('hidden');
+    }
+
+    // Reset local data store
+    state.applications = [];
+    state.companies = [];
+    state.archivedApplications = [];
+    updateMetrics();
+  }
+}
+
+async function initAuth() {
+  // Subscribe to auth state changes
+  subscribeToAuthState((event, session) => {
+    handleAuthStateChange(session);
+  });
+
+  // Check initial session
+  try {
+    const { data: { session }, error } = await getCurrentSession();
+    if (error) {
+      console.warn('Error fetching initial session:', error);
+      handleAuthStateChange(null);
+    } else {
+      handleAuthStateChange(session);
+    }
+  } catch (err) {
+    console.error('Failed to get session:', err);
+    handleAuthStateChange(null);
+  }
+}
+
 // Setup Event Listeners
 function setupEventListeners() {
+  // Authentication Listeners
+  if (elements.btnToggleSignIn) {
+    elements.btnToggleSignIn.addEventListener('click', () => setAuthMode('signin'));
+  }
+  if (elements.btnToggleSignUp) {
+    elements.btnToggleSignUp.addEventListener('click', () => setAuthMode('signup'));
+  }
+  if (elements.authForm) {
+    elements.authForm.addEventListener('submit', handleAuthSubmit);
+  }
+  if (elements.btnDemoLogin) {
+    elements.btnDemoLogin.addEventListener('click', handleDemoLogin);
+  }
+  if (elements.btnSignOut) {
+    elements.btnSignOut.addEventListener('click', handleSignOut);
+  }
+
+  // Step 2 OTP Listeners
+  if (elements.authOtpForm) {
+    elements.authOtpForm.addEventListener('submit', handleVerifyOtpSubmit);
+  }
+  if (elements.btnOtpBack) {
+    elements.btnOtpBack.addEventListener('click', showCredentialsStep);
+  }
+  if (elements.btnResendOtp) {
+    elements.btnResendOtp.addEventListener('click', handleResendOtp);
+  }
+  if (elements.authOtpInput) {
+    elements.authOtpInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '');
+      if (elements.authOtpError) elements.authOtpError.classList.add('hidden');
+      // Auto-submit if full 8-digit code is completed
+      if (e.target.value.length === 8) {
+        elements.authOtpForm?.requestSubmit();
+      }
+    });
+  }
+
   // Navigation Tabs
   elements.tabNavOverview.addEventListener('click', () => switchTab('overview'));
   elements.tabNavNew.addEventListener('click', () => switchTab('new-app'));
@@ -1411,5 +1796,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   setupEventListeners();
-  loadInitialData();
+  initAuth();
 });
